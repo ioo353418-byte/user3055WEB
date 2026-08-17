@@ -365,7 +365,10 @@
                 </div>
                 <div class="form-group">
                     <label>或输入图片 URL(留空则用上传的图)</label>
-                    <input type="text" id="bg-url" value="${esc(bg.imageUrl || '')}" placeholder="https://..." />
+                    <div style="display:flex;gap:8px;">
+                        <input type="text" id="bg-url" value="${esc(bg.imageUrl || '')}" placeholder="https://..." style="flex:1;" />
+                        <button type="button" class="btn btn-sm" id="bg-clear-btn" title="清空 URL 撤销背景图">✕ 清除</button>
+                    </div>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
@@ -402,6 +405,11 @@
         $('bg-url').addEventListener('input', updatePreview);
         $('bg-color').addEventListener('input', updatePreview);
         $('bg-opacity').addEventListener('input', updatePreview);
+        $('bg-clear-btn').addEventListener('click', () => {
+            $('bg-url').value = '';
+            updatePreview();
+            toast('已清空背景图 URL,点"保存美化设置"生效', 'warning');
+        });
 
         $('bg-file').addEventListener('change', async (e) => {
             const file = e.target.files[0];

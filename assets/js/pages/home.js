@@ -311,10 +311,16 @@
     // ---------- 应用美化配置 ----------
     function applyAppearance(ap, sections) {
         const bg = ap.globalBackground || {};
-        if (bg.color) document.body.style.backgroundColor = bg.color;
+        if (bg.color) {
+            document.body.style.backgroundColor = bg.color;
+        } else {
+            // 撤销:恢复默认
+            document.body.style.backgroundColor = '';
+        }
+
+        // 背景图:有则添加/更新,无则移除
+        let bgLayer = document.getElementById('bg-layer');
         if (bg.imageUrl) {
-            // 用一个固定背景层,避免影响布局
-            let bgLayer = document.getElementById('bg-layer');
             if (!bgLayer) {
                 bgLayer = document.createElement('div');
                 bgLayer.id = 'bg-layer';
@@ -323,6 +329,11 @@
             }
             bgLayer.style.backgroundImage = `url('${bg.imageUrl}')`;
             bgLayer.style.opacity = bg.opacity != null ? bg.opacity : 1;
+            bgLayer.style.display = 'block';
+        } else if (bgLayer) {
+            // 撤销背景图:隐藏背景层
+            bgLayer.style.display = 'none';
+            bgLayer.style.backgroundImage = 'none';
         }
     }
 

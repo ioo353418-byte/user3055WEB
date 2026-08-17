@@ -228,10 +228,11 @@
      */
     async function ghGetMeta(path) {
         const token = getToken();
-        const url = `${GH_API}/repos/${cfg.github.owner}/${cfg.github.repo}/contents/${path}?ref=${cfg.github.branch}`;
+        // 加 _t 时间戳防止 CDN 缓存旧 SHA(导致 409)
+        const url = `${GH_API}/repos/${cfg.github.owner}/${cfg.github.repo}/contents/${path}?ref=${cfg.github.branch}&_t=${Date.now()}`;
         const headers = { Accept: 'application/vnd.github+json' };
         if (token) headers.Authorization = `Bearer ${token}`;
-        const resp = await fetch(url, { headers });
+        const resp = await fetch(url, { headers, cache: 'no-store' });
         if (resp.status === 404) return null;
         if (!resp.ok) throw await parseError(resp);
         return await resp.json();
@@ -397,13 +398,28 @@
             }
         },
         async saveAppearance(appearance) {
-            const meta = await ghGetMeta(cfg.github.paths.appearance);
-            await ghPutText(
-                cfg.github.paths.appearance,
-                JSON.stringify(appearance, null, 2),
-                meta ? 'chore: update appearance.json' : 'chore: init appearance.json',
-                meta ? meta.sha : null
-            );
+            // 带 409 重试:遇到 SHA 不匹配自动重新拉取最新 SHA 重试一次
+            for (let attempt = 0; attempt < 2; attempt++) {
+                const meta = await ghGetMeta(cfg.github.paths.appearance);
+                try {
+                    await ghPutText(
+                        cfg.github.paths.appearance,
+                        JSON.stringify(appearance, null, 2),
+                        meta ? 'chore: update appearance.json' : 'chore: init appearance.json',
+                        meta ? meta.sha : null
+                    );
+                    return;  // 成功
+                } catch (e) {
+                    const is409 = e.message && (e.message.includes('409') || e.message.includes('does not match'));
+                    if (is409 && attempt === 0) {
+                        console.warn('[saveAppearance] 遇到 409,重新拉取 SHA 后重试...');
+                        // 强制绕过缓存:加随机参数
+                        await new Promise(r => setTimeout(r, 500));
+                        continue;
+                    }
+                    throw e;
+                }
+            }
         },
         /**
          * 上传背景图到 assets/backgrounds/,返回仓库内相对路径
