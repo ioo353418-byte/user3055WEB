@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>管理后台 · user3055WEB</title>
+    <meta name="robots" content="noindex,nofollow" />
+    <link rel="stylesheet" href="assets/css/style.css" />
+</head>
+<body>
+
+    <div class="admin-wrapper">
+
+        <!-- ========== 登录卡片 ========== -->
+        <section class="login-card" id="login-card">
+            <h2>🔐 管理后台登录</h2>
+            <p class="hint">
+                请输入 GitHub Personal Access Token(PAT)。<br />
+                建议使用 <strong style="color:var(--accent);">Fine-grained PAT</strong>,仅授予本仓库的
+                <strong>Contents: Read and Write</strong> 权限。<br />
+                Token 仅保存在当前标签页的 <code>sessionStorage</code> 中,关闭标签即清除,不会上传任何第三方。
+            </p>
+            <div class="form-group">
+                <label>GitHub PAT <span class="required">*</span></label>
+                <input type="password" id="pat-input" placeholder="github_pat_xxxx 或 ghp_xxxx" autocomplete="off" />
+            </div>
+            <div class="actions-bar">
+                <button class="btn btn-primary" id="login-btn">登录</button>
+                <a class="btn" href="index.html">← 返回展示页</a>
+            </div>
+            <p class="hint" style="margin-top:14px;font-size:12px;">
+                ⚠️ 提示:本管理页通过 GitHub Contents API 直接向仓库提交文件,
+                每次操作即一次 commit。大文件(>25MB)请走 Git LFS 或外部存储。
+            </p>
+        </section>
+
+        <!-- ========== 已登录后的工作区 ========== -->
+        <div id="workspace" style="display:none;">
+
+            <header class="site-header" style="padding:16px 0;">
+                <h1 class="brand">🛠️ <span class="accent">管理后台</span></h1>
+                <p class="subtitle">已登录 · 仓库: <span id="repo-info"></span></p>
+                <div class="actions-bar" style="justify-content:center;margin-top:12px;">
+                    <a class="btn" href="index.html" target="_blank">↗ 查看展示页</a>
+                    <button class="btn btn-danger" id="logout-btn">退出登录</button>
+                </div>
+            </header>
+
+            <!-- 模块切换 -->
+            <nav class="admin-nav">
+                <button class="btn active" data-tab="projects">📦 工程资源</button>
+                <button class="btn" data-tab="games">🎮 游戏进度</button>
+                <button class="btn" data-tab="diaries">📝 个人日记</button>
+            </nav>
+
+            <!-- ============== 工程资源模块 ============== -->
+            <section class="module" id="tab-projects">
+                <h3>📦 新增 / 编辑工程资源</h3>
+                <form id="form-project">
+                    <input type="hidden" id="proj-id" />
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>工程名称 <span class="required">*</span></label>
+                            <input type="text" id="proj-name" required maxlength="80" placeholder="例:机械臂控制程序" />
+                        </div>
+                        <div class="form-group">
+                            <label>标签(逗号分隔)</label>
+                            <input type="text" id="proj-tags" placeholder="例:Python, MuJoCo" />
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>简介</label>
+                        <textarea id="proj-desc" maxlength="500" placeholder="一句话介绍这个工程..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>压缩包文件(.zip / .rar / .7z 等)</label>
+                        <input type="file" id="proj-file" />
+                        <p class="hint" style="font-size:12px;margin-top:4px;">
+                            留空则不更新压缩包;编辑模式下留空会保留原文件。
+                        </p>
+                    </div>
+                    <div class="actions-bar">
+                        <button type="submit" class="btn btn-primary" id="proj-submit">保存</button>
+                        <button type="button" class="btn" id="proj-reset">清空</button>
+                    </div>
+                </form>
+
+                <h3 style="margin-top:24px;">已发布工程</h3>
+                <div id="admin-list-projects">
+                    <div class="loading">加载中</div>
+                </div>
+            </section>
+
+            <!-- ============== 游戏进度模块 ============== -->
+            <section class="module" id="tab-games" style="display:none;">
+                <h3>🎮 新增 / 编辑游戏项目</h3>
+                <form id="form-game">
+                    <input type="hidden" id="game-id" />
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>游戏名称 <span class="required">*</span></label>
+                            <input type="text" id="game-name" required maxlength="80" placeholder="例:像素冒险" />
+                        </div>
+                        <div class="form-group">
+                            <label>开发进度 (%) <span class="required">*</span></label>
+                            <input type="number" id="game-progress" min="0" max="100" required value="0" />
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>开发进度说明</label>
+                        <textarea id="game-desc" maxlength="500" placeholder="当前阶段、待办、里程碑..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>备份压缩包</label>
+                        <input type="file" id="game-file" />
+                    </div>
+                    <div class="actions-bar">
+                        <button type="submit" class="btn btn-primary" id="game-submit">保存</button>
+                        <button type="button" class="btn" id="game-reset">清空</button>
+                    </div>
+                </form>
+
+                <h3 style="margin-top:24px;">已发布游戏</h3>
+                <div id="admin-list-games">
+                    <div class="loading">加载中</div>
+                </div>
+            </section>
+
+            <!-- ============== 个人日记模块 ============== -->
+            <section class="module" id="tab-diaries" style="display:none;">
+                <h3>📝 新增 / 编辑日记</h3>
+                <form id="form-diary">
+                    <input type="hidden" id="diary-id" />
+                    <input type="hidden" id="diary-old-path" />
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>日记标题 <span class="required">*</span></label>
+                            <input type="text" id="diary-title" required maxlength="100" placeholder="例:今天完成了一个 demo" />
+                        </div>
+                        <div class="form-group">
+                            <label>日期 <span class="required">*</span></label>
+                            <input type="date" id="diary-date" required />
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>摘要(展示页列表显示)</label>
+                        <input type="text" id="diary-summary" maxlength="200" placeholder="一句话摘要..." />
+                    </div>
+                    <div class="form-group">
+                        <label>方式一:直接编写 Markdown 内容</label>
+                        <textarea id="diary-content" placeholder="# 标题&#10;&#10;在这里写你的日记..." style="min-height:160px;"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>方式二:上传 .md 文件(优先于方式一)</label>
+                        <input type="file" id="diary-file" accept=".md,.markdown,.txt" />
+                    </div>
+                    <div class="actions-bar">
+                        <button type="submit" class="btn btn-primary" id="diary-submit">保存</button>
+                        <button type="button" class="btn" id="diary-reset">清空</button>
+                    </div>
+                </form>
+
+                <h3 style="margin-top:24px;">已发布日记</h3>
+                <div id="admin-list-diaries">
+                    <div class="loading">加载中</div>
+                </div>
+            </section>
+
+        </div>
+    </div>
+
+    <div class="toast-container" id="toast-container"></div>
+
+    <script src="assets/js/config.js"></script>
+    <script src="assets/js/api.js"></script>
+    <script src="assets/js/pages/admin.js"></script>
+
+</body>
+</html>
