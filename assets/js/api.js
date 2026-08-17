@@ -93,28 +93,50 @@
 
     /**
      * 读取 raw.githubusercontent.com 上的 JSON(只读,无需鉴权,CDN 稳定)
+     * 带一次重试:首次失败(网络抖动)等 1 秒后重试一次
      */
     async function ghGetJsonRaw(path, fallback) {
         const rawUrl = `https://raw.githubusercontent.com/${cfg.github.owner}/${cfg.github.repo}/${cfg.github.branch}/${path}`;
-        const resp = await fetchWithTimeout(rawUrl, {}, 10000);
-        if (!resp.ok) return fallback;
-        return await resp.json();
+        for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+                const resp = await fetchWithTimeout(rawUrl, { cache: 'no-store' }, 12000);
+                if (!resp.ok) {
+                    if (attempt === 0) { await new Promise(r => setTimeout(r, 1000)); continue; }
+                    return fallback;
+                }
+                return await resp.json();
+            } catch (e) {
+                console.warn(`[ghGetJsonRaw] 尝试 ${attempt + 1} 失败: ${path}`, e.message);
+                if (attempt === 0) { await new Promise(r => setTimeout(r, 1000)); continue; }
+                return fallback;
+            }
+        }
+        return fallback;
     }
 
     /**
      * 读取仓库中某个 JSON 文件,返回解析后的对象
      * 文件不存在时返回 fallback(默认空数组)
-     * 策略:先试 api.github.com(带 token 可读最新),超时/失败则回退 raw(CDN 稳定)
+     * 策略:
+     *   - 有 token(管理页):走 api.github.com(可读最新,可写)
+     *   - 无 token(展示页):直接走 raw CDN(稳定,不限流,匿名友好)
      */
     async function ghGetJson(path, fallback) {
-        const url = `${GH_API}/repos/${cfg.github.owner}/${cfg.github.repo}/contents/${path}?ref=${cfg.github.branch}`;
-        const headers = { Accept: 'application/vnd.github+json' };
         const token = getToken();
-        if (token) headers.Authorization = `Bearer ${token}`;
+
+        // 无 token:展示页匿名访问,直接用 raw CDN(避免 API 限流)
+        if (!token) {
+            return await ghGetJsonRaw(path, fallback);
+        }
+
+        // 有 token:管理页,走 api.github.com 读取最新
+        const url = `${GH_API}/repos/${cfg.github.owner}/${cfg.github.repo}/contents/${path}?ref=${cfg.github.branch}&_t=${Date.now()}`;
+        const headers = { Accept: 'application/vnd.github+json' };
+        headers.Authorization = `Bearer ${token}`;
 
         let resp;
         try {
-            resp = await fetchWithTimeout(url, { headers }, 8000);
+            resp = await fetchWithTimeout(url, { headers, cache: 'no-store' }, 10000);
         } catch (e) {
             // 网络错误或超时 → 回退 raw
             console.warn(`[ghGetJson] api.github.com 失败,回退 raw: ${path}`, e.message);
