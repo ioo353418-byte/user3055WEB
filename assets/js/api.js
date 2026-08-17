@@ -229,14 +229,21 @@
          */
         async validateToken(token) {
             const url = `${GH_API}/repos/${cfg.github.owner}/${cfg.github.repo}`;
-            const resp = await fetch(url, {
-                headers: {
-                    'Accept': 'application/vnd.github+json',
-                    'Authorization': `Bearer ${token}`
-                }
-            });
+            let resp;
+            try {
+                resp = await fetch(url, {
+                    headers: {
+                        'Accept': 'application/vnd.github+json',
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+            } catch (e) {
+                // fetch 本身抛异常 = 网络层错误(被 reset / 代理拦截 / CORS 失败)
+                throw new Error('网络错误:无法访问 api.github.com(可能需要配置浏览器代理)' + (e.message ? ' — ' + e.message : ''));
+            }
             if (resp.status === 401) throw new Error('PAT 无效或已过期');
-            if (resp.status === 404) throw new Error('仓库不存在或 PAT 无仓库读取权限');
+            if (resp.status === 404) throw new Error('仓库不存在或 PAT 无仓库读取权限(检查 config.js 中 owner/repo)');
+            if (resp.status === 403) throw new Error('PAT 权限不足或触发限流(403)');
             if (!resp.ok) throw await parseError(resp);
             return true;
         },

@@ -46,5 +46,8 @@ window.SITE_CONFIG = {
     backendApiBase: '',
 
     // 管理页 token 在 sessionStorage 中的存储键
-    tokenStorageKey: 'github_pat_session'
+    tokenStorageKey: 'github_pat_session',
+
+    // 管理页加密保险库在 localStorage 中的存储键(用于"密码解锁"功能)
+    adminVaultKey: 'user3055web_admin_vault'
 };

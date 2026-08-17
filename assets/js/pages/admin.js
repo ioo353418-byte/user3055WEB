@@ -1,6 +1,6 @@
 /**
  * 管理页逻辑
- *  - PAT 登录/校验/退出
+ *  - PAT 登录/校验/退出(支持密码解锁,免每次输 PAT)
  *  - 工程 / 游戏 / 日记 的 CRUD
  *  - 文件压缩包与 markdown 上传
  *  - 三个 Tab 切换
@@ -10,6 +10,65 @@
 
     const cfg = window.SITE_CONFIG;
     const $ = id => document.getElementById(id);
+
+    // ---------- 加密保险库(Web Crypto API:AES-GCM 256 + PBKDF2) ----------
+    const VAULT_SALT = 'user3055WEB-admin-vault-v1';
+
+    async function deriveKey(password) {
+        const enc = new TextEncoder();
+        const keyMaterial = await crypto.subtle.importKey(
+            'raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']
+        );
+        return await crypto.subtle.deriveKey(
+            { name: 'PBKDF2', salt: enc.encode(VAULT_SALT), iterations: 100000, hash: 'SHA-256' },
+            keyMaterial,
+            { name: 'AES-GCM', length: 256 },
+            false,
+            ['encrypt', 'decrypt']
+        );
+    }
+
+    async function encryptPat(pat, password) {
+        const key = await deriveKey(password);
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const enc = new TextEncoder();
+        const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(pat));
+        const combined = new Uint8Array(iv.length + ct.byteLength);
+        combined.set(iv, 0);
+        combined.set(new Uint8Array(ct), iv.length);
+        // 转 base64(分段避免大数组爆栈,PAT 加密后很短,直接用即可)
+        let binary = '';
+        for (let i = 0; i < combined.length; i++) binary += String.fromCharCode(combined[i]);
+        return btoa(binary);
+    }
+
+    async function decryptPat(vaultB64, password) {
+        const binary = atob(vaultB64);
+        const combined = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) combined[i] = binary.charCodeAt(i);
+        const iv = combined.slice(0, 12);
+        const ct = combined.slice(12);
+        const key = await deriveKey(password);
+        const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct);
+        return new TextDecoder().decode(pt);
+    }
+
+    function saveVault(encryptedPat) {
+        const data = {
+            enc: encryptedPat,
+            updatedAt: new Date().toISOString()
+        };
+        localStorage.setItem(cfg.adminVaultKey, JSON.stringify(data));
+    }
+    function loadVault() {
+        try {
+            const raw = localStorage.getItem(cfg.adminVaultKey);
+            return raw ? JSON.parse(raw) : null;
+        } catch (_) { return null; }
+    }
+    function clearVault() {
+        localStorage.removeItem(cfg.adminVaultKey);
+    }
 
     // ---------- 工具 ----------
     function esc(str) {
@@ -56,23 +115,130 @@
         }
     }
 
-    // ---------- 登录/退出 ----------
-    async function login() {
-        const token = $('pat-input').value.trim();
-        if (!token) return toast('请输入 PAT', 'warning');
-        await withLoading($('login-btn'), async () => {
-            await window.API.validateToken(token);
-            window.API.setToken(token);
-            toast('登录成功', 'success');
+    // ---------- 登录模式切换 ----------
+    function showSetupMode() {
+        $('setup-mode').style.display = 'block';
+        $('unlock-mode').style.display = 'none';
+        $('pat-input').value = '';
+        $('pwd-input').value = '';
+        $('pat-input').focus();
+    }
+    function showUnlockMode() {
+        const vault = loadVault();
+        if (!vault) { showSetupMode(); return; }
+        $('setup-mode').style.display = 'none';
+        $('unlock-mode').style.display = 'block';
+        const updated = fmtDate(vault.updatedAt);
+        $('vault-info').textContent = `加密凭据上次设置:${updated}`;
+        $('unlock-pwd').value = '';
+        $('unlock-pwd').focus();
+    }
+
+    // ---------- 首次设置:输入 PAT + 设置密码 ----------
+    async function setupAndLogin() {
+        const pat = $('pat-input').value.trim();
+        const pwd = $('pwd-input').value;
+        if (!pat) return toast('请输入 PAT', 'warning');
+        if (pwd.length < 4) return toast('管理密码至少 4 位', 'warning');
+
+        await withLoading($('setup-btn'), async () => {
+            // 尝试验证 PAT(网络问题时允许跳过)
+            let valid = true;
+            let netError = null;
+            try {
+                await window.API.validateToken(pat);
+            } catch (e) {
+                netError = e;
+                // 区分错误类型
+                if (e.message && e.message.includes('PAT 无效')) {
+                    throw e;  // 确定是 PAT 错,直接抛
+                }
+                // 可能是网络/404/403,问用户是否继续
+                const ok = confirm(
+                    `⚠️ PAT 验证失败,可能是网络问题(浏览器无法访问 api.github.com)。\n\n` +
+                    `错误:${e.message}\n\n` +
+                    `点击"确定"仍然保存(后续操作若失败需检查网络),\n` +
+                    `点击"取消"返回修正。`
+                );
+                if (!ok) return;
+                valid = false;
+            }
+
+            // 加密保存 PAT
+            const enc = await encryptPat(pat, pwd);
+            saveVault(enc);
+            window.API.setToken(pat);
+            toast(valid ? '登录成功' : '已保存(PAT 未验证,后续操作可能失败)', valid ? 'success' : 'warning');
             showWorkspace();
         });
     }
+
+    // ---------- 解锁:输入密码 ----------
+    async function unlock() {
+        const pwd = $('unlock-pwd').value;
+        if (!pwd) return toast('请输入管理密码', 'warning');
+        const vault = loadVault();
+        if (!vault) { toast('未找到加密凭据,请重新设置', 'warning'); showSetupMode(); return; }
+
+        await withLoading($('unlock-btn'), async () => {
+            let pat;
+            try {
+                pat = await decryptPat(vault.enc, pwd);
+            } catch (_) {
+                throw new Error('密码错误,解密失败');
+            }
+            window.API.setToken(pat);
+            toast('解锁成功', 'success');
+            showWorkspace();
+        });
+    }
+
+    // ---------- 重置保险库(忘记密码) ----------
+    function resetVault() {
+        if (!confirm('确定重置凭据?将清除本地加密的 PAT,下次需要重新输入 PAT 设置密码。')) return;
+        clearVault();
+        window.API.setToken('');
+        toast('已重置,请重新设置', 'success');
+        showSetupMode();
+    }
+
+    // ---------- 更换 PAT(保留密码) ----------
+    async function replacePat() {
+        const newPat = prompt('粘贴新的 PAT(将用原密码加密保存):');
+        if (!newPat) return;
+        const vault = loadVault();
+        if (!vault) { toast('未找到加密凭据,请先完成首次设置', 'warning'); return; }
+        // 需要原密码来重新加密
+        const pwd = prompt('请输入当前管理密码以确认:');
+        if (!pwd) return;
+        await withLoading(document.body, async () => {
+            // 先验证原密码能解密
+            try {
+                await decryptPat(vault.enc, pwd);
+            } catch (_) {
+                throw new Error('密码错误');
+            }
+            // 用新 PAT + 原密码加密
+            const enc = await encryptPat(newPat.trim(), pwd);
+            saveVault(enc);
+            window.API.setToken(newPat.trim());
+            toast('PAT 已更新', 'success');
+            showWorkspace();
+        });
+    }
+
+    // ---------- 退出登录 ----------
     function logout() {
         window.API.setToken('');
-        toast('已退出登录', 'success');
+        toast('已退出登录(加密凭据保留,下次只需密码)', 'success');
         $('workspace').style.display = 'none';
         $('login-card').style.display = 'block';
-        $('pat-input').value = '';
+        // 如果有 vault,显示解锁模式;否则显示设置模式
+        if (loadVault()) {
+            showUnlockMode();
+        } else {
+            showSetupMode();
+        }
     }
     async function showWorkspace() {
         $('login-card').style.display = 'none';
@@ -464,11 +630,27 @@
     //  初始化
     // ================================================================
     function bindEvents() {
-        $('login-btn').addEventListener('click', login);
-        $('logout-btn').addEventListener('click', logout);
+        // 首次设置
+        $('setup-btn').addEventListener('click', setupAndLogin);
         $('pat-input').addEventListener('keydown', e => {
-            if (e.key === 'Enter') login();
+            if (e.key === 'Enter') $('pwd-input').focus();
         });
+        $('pwd-input').addEventListener('keydown', e => {
+            if (e.key === 'Enter') setupAndLogin();
+        });
+
+        // 解锁
+        $('unlock-btn').addEventListener('click', unlock);
+        $('unlock-pwd').addEventListener('keydown', e => {
+            if (e.key === 'Enter') unlock();
+        });
+
+        // 重置 / 换 PAT
+        $('reset-vault').addEventListener('click', e => { e.preventDefault(); resetVault(); });
+        $('re-pat').addEventListener('click', e => { e.preventDefault(); replacePat(); });
+
+        // 退出
+        $('logout-btn').addEventListener('click', logout);
 
         $('form-project').addEventListener('submit', submitProject);
         $('proj-reset').addEventListener('click', resetProjectForm);
@@ -488,17 +670,19 @@
 
     document.addEventListener('DOMContentLoaded', () => {
         bindEvents();
-        // 已有 token 则自动进入工作区
-        if (window.API.getToken()) {
-            (async () => {
-                try {
-                    await window.API.validateToken(window.API.getToken());
-                    showWorkspace();
-                } catch (e) {
-                    window.API.setToken('');
-                    toast('已保存的 PAT 失效,请重新登录', 'warning');
-                }
-            })();
+        // 启动时根据状态决定显示模式
+        const existingToken = window.API.getToken();
+        const vault = loadVault();
+
+        if (existingToken) {
+            // 当前标签已有 token(刷新场景),直接进工作区
+            showWorkspace();
+        } else if (vault) {
+            // 有加密凭据,显示解锁模式
+            showUnlockMode();
+        } else {
+            // 首次使用,显示设置模式
+            showSetupMode();
         }
     });
 })();

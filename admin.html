@@ -14,23 +14,55 @@
         <!-- ========== 登录卡片 ========== -->
         <section class="login-card" id="login-card">
             <h2>🔐 管理后台登录</h2>
-            <p class="hint">
-                请输入 GitHub Personal Access Token(PAT)。<br />
-                建议使用 <strong style="color:var(--accent);">Fine-grained PAT</strong>,仅授予本仓库的
-                <strong>Contents: Read and Write</strong> 权限。<br />
-                Token 仅保存在当前标签页的 <code>sessionStorage</code> 中,关闭标签即清除,不会上传任何第三方。
-            </p>
-            <div class="form-group">
-                <label>GitHub PAT <span class="required">*</span></label>
-                <input type="password" id="pat-input" placeholder="github_pat_xxxx 或 ghp_xxxx" autocomplete="off" />
+
+            <!-- 模式 1: 首次设置(输入 PAT + 设置管理密码) -->
+            <div id="setup-mode">
+                <p class="hint">
+                    首次使用,请输入 GitHub PAT 并设置一个管理密码。<br />
+                    <strong style="color:var(--accent);">之后只需输入管理密码即可登录</strong>,无需再复制长 PAT。<br />
+                    PAT 会用管理密码加密后存在浏览器本地,关闭浏览器也不丢失。
+                </p>
+                <div class="form-group">
+                    <label>GitHub PAT <span class="required">*</span></label>
+                    <input type="password" id="pat-input" placeholder="github_pat_xxxx 或 ghp_xxxx" autocomplete="off" />
+                    <p class="hint" style="font-size:11px;margin-top:4px;">
+                        建议使用 Fine-grained PAT,仅授予本仓库 Contents: Read and Write 权限。
+                    </p>
+                </div>
+                <div class="form-group">
+                    <label>管理密码(用于下次免输 PAT)<span class="required">*</span></label>
+                    <input type="password" id="pwd-input" placeholder="至少 4 位,自己记住" autocomplete="off" />
+                </div>
+                <div class="actions-bar">
+                    <button class="btn btn-primary" id="setup-btn">设置并登录</button>
+                    <a class="btn" href="index.html">← 返回展示页</a>
+                </div>
             </div>
-            <div class="actions-bar">
-                <button class="btn btn-primary" id="login-btn">登录</button>
-                <a class="btn" href="index.html">← 返回展示页</a>
+
+            <!-- 模式 2: 解锁(只需管理密码) -->
+            <div id="unlock-mode" style="display:none;">
+                <p class="hint">
+                    ✅ 已保存加密凭据,输入管理密码即可解锁。<br />
+                    <span id="vault-info" style="font-size:11px;opacity:0.7;"></span>
+                </p>
+                <div class="form-group">
+                    <label>管理密码 <span class="required">*</span></label>
+                    <input type="password" id="unlock-pwd" placeholder="管理密码" autocomplete="off" />
+                </div>
+                <div class="actions-bar">
+                    <button class="btn btn-primary" id="unlock-btn">🔓 解锁</button>
+                    <a class="btn" href="index.html">← 返回展示页</a>
+                </div>
+                <p class="hint" style="margin-top:14px;font-size:12px;">
+                    <a href="#" id="reset-vault" style="color:var(--danger);">忘记密码?重置凭据</a>
+                    <span style="margin:0 8px;opacity:0.4;">·</span>
+                    <a href="#" id="re-pat" style="color:var(--warning);">更换 PAT(保留密码)</a>
+                </p>
             </div>
-            <p class="hint" style="margin-top:14px;font-size:12px;">
-                ⚠️ 提示:本管理页通过 GitHub Contents API 直接向仓库提交文件,
-                每次操作即一次 commit。大文件(>25MB)请走 Git LFS 或外部存储。
+
+            <p class="hint" style="margin-top:14px;font-size:11px;border-top:1px solid var(--border-color);padding-top:10px;">
+                ⚠️ 安全说明:加密使用 AES-GCM 256 + PBKDF2(10万次迭代)。
+                管理密码请避免过于简单(如 1234)。本机浏览器被他人使用时请点"退出登录"。
             </p>
         </section>
 
