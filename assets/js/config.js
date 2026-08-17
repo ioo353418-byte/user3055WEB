@@ -37,8 +37,10 @@ window.SITE_CONFIG = {
             games: 'data/games.json',
             diaries: 'data/diaries.json',
             sections: 'data/sections.json',
+            appearance: 'data/appearance.json',
             diariesDir: 'data/diaries',
-            uploadsDir: 'data/uploads'
+            uploadsDir: 'data/uploads',
+            backgroundsDir: 'assets/backgrounds'
         }
     },
 

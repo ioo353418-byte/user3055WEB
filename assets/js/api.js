@@ -380,12 +380,62 @@
             return path;
         },
 
-        // ---- 通用删除 ----
-        async deleteFile(path, sha, message) {
-            return ghDelete(path, sha, message || `delete: ${path}`);
+        // ---- 美化配置 ----
+        async getAppearance() {
+            try {
+                return await ghGetJson(cfg.github.paths.appearance, {
+                    globalBackground: { imageUrl: '', color: '#0d1117', opacity: 1 },
+                    sectionOrder: ['projects', 'games', 'diaries'],
+                    sectionBackgrounds: {}
+                });
+            } catch (_) {
+                return {
+                    globalBackground: { imageUrl: '', color: '#0d1117', opacity: 1 },
+                    sectionOrder: ['projects', 'games', 'diaries'],
+                    sectionBackgrounds: {}
+                };
+            }
         },
+        async saveAppearance(appearance) {
+            const meta = await ghGetMeta(cfg.github.paths.appearance);
+            await ghPutText(
+                cfg.github.paths.appearance,
+                JSON.stringify(appearance, null, 2),
+                meta ? 'chore: update appearance.json' : 'chore: init appearance.json',
+                meta ? meta.sha : null
+            );
+        },
+        /**
+         * 上传背景图到 assets/backgrounds/,返回仓库内相对路径
+         */
+        async uploadBackground(file) {
+            const ext = (file.name.split('.').pop() || 'png').toLowerCase();
+            const path = `${cfg.github.paths.backgroundsDir}/bg-${Date.now()}.${ext}`;
+            const b64 = await fileToBase64(file);
+            await ghPutBinary(path, b64, `upload: background ${file.name}`);
+            return path;
+        },
+        /**
+         * 获取文件元信息(用于删除)
+         */
         async getFileMeta(path) {
-            return ghGetMeta(path);
+            return await ghGetMeta(path);
+        },
+        /**
+         * 删除文件
+         */
+        async deleteFile(path, sha, message) {
+            const url = `${GH_API}/repos/${cfg.github.owner}/${cfg.github.repo}/contents/${path}`;
+            const headers = { Accept: 'application/vnd.github+json' };
+            const token = getToken();
+            if (token) headers.Authorization = `Bearer ${token}`;
+            const resp = await fetchWithTimeout(url, {
+                method: 'DELETE',
+                headers: { ...headers, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: message || `delete: ${path}`, sha })
+            }, 15000);
+            if (!resp.ok) throw await parseError(resp);
+            return true;
         },
 
         // ---- 工具 ----

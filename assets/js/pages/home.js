@@ -272,18 +272,19 @@
         renderContact();
         document.getElementById('year').textContent = new Date().getFullYear();
 
-        // 并行加载四个数据源(含自定义板块)
+        // 并行加载五个数据源(含自定义板块 + 美化配置)
         const results = await Promise.allSettled([
             window.API.listProjects(),
             window.API.listGames(),
             window.API.listDiaries(),
-            window.API.listSections()
+            window.API.listSections(),
+            window.API.getAppearance()
         ]);
 
-        const [proj, games, diaries, sections] = results.map(r => {
+        const [proj, games, diaries, sections, appearance] = results.map(r => {
             if (r.status === 'fulfilled') return r.value;
             console.error('[加载失败]', r.reason);
-            return [];
+            return null;
         });
 
         if (results[0].status === 'rejected') toast('工程数据加载失败', 'error');
@@ -291,10 +292,84 @@
         if (results[2].status === 'rejected') toast('日记数据加载失败', 'error');
         if (results[3].status === 'rejected') toast('自定义板块加载失败', 'error');
 
-        renderProjects(proj);
-        renderGames(games);
-        renderDiaries(diaries);
-        renderSections(sections);
+        // 应用美化配置(全局背景 + 板块排序)
+        applyAppearance(appearance || {
+            globalBackground: { imageUrl: '', color: '', opacity: 1 },
+            sectionOrder: ['projects', 'games', 'diaries'],
+            sectionBackgrounds: {}
+        }, sections || []);
+
+        renderProjects(proj || []);
+        renderGames(games || []);
+        renderDiaries(diaries || []);
+        renderSections(sections || []);
+
+        // 按 sectionOrder 重排 DOM
+        reorderPanels(appearance || { sectionOrder: ['projects', 'games', 'diaries'] });
+    }
+
+    // ---------- 应用美化配置 ----------
+    function applyAppearance(ap, sections) {
+        const bg = ap.globalBackground || {};
+        if (bg.color) document.body.style.backgroundColor = bg.color;
+        if (bg.imageUrl) {
+            // 用一个固定背景层,避免影响布局
+            let bgLayer = document.getElementById('bg-layer');
+            if (!bgLayer) {
+                bgLayer = document.createElement('div');
+                bgLayer.id = 'bg-layer';
+                bgLayer.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:-1;background-size:cover;background-position:center;';
+                document.body.insertBefore(bgLayer, document.body.firstChild);
+            }
+            bgLayer.style.backgroundImage = `url('${bg.imageUrl}')`;
+            bgLayer.style.opacity = bg.opacity != null ? bg.opacity : 1;
+        }
+    }
+
+    // ---------- 按排序重排面板 ----------
+    function reorderPanels(ap) {
+        const grid = document.querySelector('.main-grid');
+        if (!grid) return;
+        const order = ap.sectionOrder || ['projects', 'games', 'diaries'];
+        const panels = {};
+        // 系统板块
+        const sysMap = { projects: '.panel-projects', games: '.panel-games', diaries: '.panel-diaries' };
+        Object.keys(sysMap).forEach(k => {
+            panels[k] = grid.querySelector(sysMap[k]);
+        });
+        // 自定义板块
+        grid.querySelectorAll('.panel-custom').forEach(p => {
+            panels[p.dataset.id] = p;
+        });
+        // 按 order 顺序重新插入
+        order.forEach(id => {
+            const panel = panels[id];
+            if (panel) {
+                // 应用小背景图
+                const secBg = (ap.sectionBackgrounds || {})[id];
+                if (secBg && secBg.path) {
+                    panel.style.backgroundImage = `url('${window.API.rawUrl(secBg.path)}')`;
+                    panel.style.backgroundSize = 'cover';
+                    panel.style.backgroundPosition = 'center';
+                    panel.style.position = 'relative';
+                    // 加半透明遮罩保证文字可读
+                    let mask = panel.querySelector('.panel-bg-mask');
+                    if (!mask) {
+                        mask = document.createElement('div');
+                        mask.className = 'panel-bg-mask';
+                        mask.style.cssText = 'position:absolute;inset:0;background:rgba(13,17,23,0.55);z-index:0;';
+                        panel.insertBefore(mask, panel.firstChild);
+                    }
+                    mask.style.opacity = 1 - (secBg.opacity != null ? secBg.opacity : 1);
+                    // 内容提到上层
+                    panel.querySelectorAll('.panel-header, .panel-body').forEach(el => {
+                        el.style.position = 'relative';
+                        el.style.zIndex = '1';
+                    });
+                }
+                grid.appendChild(panel);
+            }
+        });
     }
 
     document.addEventListener('DOMContentLoaded', init);

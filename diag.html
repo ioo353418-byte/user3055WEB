@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>API 连通性诊断</title>
+<style>
+body { font-family: monospace; padding: 20px; background: #0d1117; color: #c9d1d9; line-height: 1.6; }
+h2 { color: #58a6ff; margin-top: 20px; }
+.ok { color: #3fb950; }
+.fail { color: #f85149; }
+.warn { color: #d29922; }
+pre { background: #161b22; padding: 10px; border-radius: 6px; overflow-x: auto; border: 1px solid #30363d; }
+input { width: 100%; padding: 8px; background: #161b22; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; margin: 8px 0; }
+button { padding: 8px 16px; background: #238636; color: white; border: none; border-radius: 6px; cursor: pointer; }
+button:hover { background: #2ea043; }
+</style>
+</head>
+<body>
+<h1>API 连通性诊断(浏览器视角)</h1>
+<p>这个页面在浏览器中直接测试管理页用到的 GitHub API 请求,看是否能成功。</p>
+
+<input type="password" id="pat" placeholder="粘贴 PAT(仅本地诊断,不会上传)">
+<button onclick="runDiag()">运行诊断</button>
+
+<div id="output"></div>
+
+<script>
+async function runDiag() {
+    const out = document.getElementById('output');
+    out.innerHTML = '';
+    const pat = document.getElementById('pat').value.trim();
+    if (!pat) { out.innerHTML = '<p class="warn">请输入 PAT</p>'; return; }
+
+    function log(msg, cls) {
+        out.innerHTML += `<div class="${cls||''}">${msg}</div>`;
+    }
+
+    // 测试 1: 不带认证,测网络连通
+    log('<h2>测试 1: 网络连通(GET /repos 无认证)</h2>');
+    try {
+        const r = await fetch('https://api.github.com/repos/ioo353418-byte/user3055WEB', {
+            headers: { 'Accept': 'application/vnd.github+json' }
+        });
+        log(`<p class="${r.ok?'ok':'fail'}">状态: ${r.status} ${r.statusText}</p>`, r.ok?'ok':'fail');
+        const j = await r.json();
+        log(`<pre>full_name: ${j.full_name}\ndefault_branch: ${j.default_branch}\nprivate: ${j.private}</pre>`);
+    } catch (e) {
+        log(`<p class="fail">请求失败(网络/CORS/代理问题): ${e.message}</p>`, 'fail');
+        log(`<pre>${e.stack}</pre>`);
+    }
+
+    // 测试 2: 带 PAT 认证
+    log('<h2>测试 2: 带 PAT 认证(GET /repos)</h2>');
+    try {
+        const r = await fetch('https://api.github.com/repos/ioo353418-byte/user3055WEB', {
+            headers: {
+                'Accept': 'application/vnd.github+json',
+                'Authorization': 'Bearer ' + pat
+            }
+        });
+        log(`<p class="${r.ok?'ok':'fail'}">状态: ${r.status} ${r.statusText}</p>`, r.ok?'ok':'fail');
+        if (r.ok) {
+            const j = await r.json();
+            log(`<pre>permissions: admin=${j.permissions.admin} push=${j.permissions.push} pull=${j.permissions.pull}</pre>`);
+        } else {
+            const t = await r.text();
+            log(`<pre>${t}</pre>`);
+        }
+    } catch (e) {
+        log(`<p class="fail">请求失败: ${e.message}</p>`, 'fail');
+    }
+
+    // 测试 3: 模拟管理页 validateToken 的请求
+    log('<h2>测试 3: 模拟 validateToken(管理页登录用的请求)</h2>');
+    try {
+        const r = await fetch('https://api.github.com/repos/ioo353418-byte/user3055WEB', {
+            headers: {
+                'Accept': 'application/vnd.github+json',
+                'Authorization': 'Bearer ' + pat
+            }
+        });
+        log(`<p>状态码: ${r.status}</p>`);
+        if (r.status === 401) log('<p class="fail">→ 401: PAT 无效</p>', 'fail');
+        else if (r.status === 404) log('<p class="fail">→ 404: 这就是管理页报的错!但 PowerShell 能 200,说明浏览器端有网络/CORS/代理问题</p>', 'fail');
+        else if (r.status === 200) log('<p class="ok">→ 200: 一切正常,管理页应该能登录</p>', 'ok');
+        else log(`<p class="warn">→ 其他状态: ${r.status}</p>`, 'warn');
+    } catch (e) {
+        log(`<p class="fail">请求异常(可能被代理拦截或网络中断): ${e.message}</p>`, 'fail');
+        log('<p class="warn">→ 这就是根本原因:浏览器无法访问 api.github.com</p>', 'warn');
+    }
+
+    // 测试 4: 测试 raw.githubusercontent.com(展示页用)
+    log('<h2>测试 4: raw.githubusercontent.com(展示页数据源)</h2>');
+    try {
+        const r = await fetch('https://raw.githubusercontent.com/ioo353418-byte/user3055WEB/main/data/projects.json');
+        log(`<p class="${r.ok?'ok':'fail'}">状态: ${r.status}</p>`, r.ok?'ok':'fail');
+        const t = await r.text();
+        log(`<pre>${t.slice(0, 200)}</pre>`);
+    } catch (e) {
+        log(`<p class="fail">请求失败: ${e.message}</p>`, 'fail');
+    }
+}
+</script>
+</body>
+</html>

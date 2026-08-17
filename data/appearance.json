@@ -1,0 +1,9 @@
+{
+  "globalBackground": {
+    "imageUrl": "",
+    "color": "#0d1117",
+    "opacity": 1
+  },
+  "sectionOrder": ["projects", "games", "diaries"],
+  "sectionBackgrounds": {}
+}
