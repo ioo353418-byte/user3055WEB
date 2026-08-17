@@ -80,13 +80,52 @@
 
             <!-- 模块切换 -->
             <nav class="admin-nav">
-                <button class="btn active" data-tab="projects">📦 工程资源</button>
+                <button class="btn active" data-tab="sections">🗂️ 板块管理</button>
+                <button class="btn" data-tab="projects">📦 工程资源</button>
                 <button class="btn" data-tab="games">🎮 游戏进度</button>
                 <button class="btn" data-tab="diaries">📝 个人日记</button>
             </nav>
 
+            <!-- ============== 板块管理模块 ============== -->
+            <section class="module" id="tab-sections">
+                <h3>🗂️ 新增 / 编辑自定义板块</h3>
+                <p class="hint" style="margin-bottom:14px;font-size:13px;">
+                    在此添加的板块会作为新栏目出现在展示页(原有工程/游戏/日记三个板块保留)。
+                    可为每个板块添加多个条目(资源/链接/说明)。
+                </p>
+                <form id="form-section">
+                    <input type="hidden" id="sec-id" />
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>板块名称 <span class="required">*</span></label>
+                            <input type="text" id="sec-name" required maxlength="40" placeholder="例:机械臂开发专题" />
+                        </div>
+                        <div class="form-group">
+                            <label>图标(emoji)</label>
+                            <input type="text" id="sec-emoji" maxlength="4" placeholder="🤖" />
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>板块描述(可选)</label>
+                        <input type="text" id="sec-desc" maxlength="100" placeholder="一句话说明这个板块的主题..." />
+                    </div>
+                    <div class="actions-bar">
+                        <button type="submit" class="btn btn-primary" id="sec-submit">保存板块</button>
+                        <button type="button" class="btn" id="sec-reset">清空</button>
+                    </div>
+                </form>
+
+                <h3 style="margin-top:24px;">已有板块</h3>
+                <div id="admin-list-sections">
+                    <div class="loading">加载中</div>
+                </div>
+            </section>
+
+            <!-- ============== 板块条目管理弹层(动态渲染) ============== -->
+            <!-- 由 admin.js 通过 modal 动态生成,这里仅占位 -->
+
             <!-- ============== 工程资源模块 ============== -->
-            <section class="module" id="tab-projects">
+            <section class="module" id="tab-projects" style="display:none;">
                 <h3>📦 新增 / 编辑工程资源</h3>
                 <form id="form-project">
                     <input type="hidden" id="proj-id" />

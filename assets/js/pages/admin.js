@@ -245,6 +245,7 @@
         $('workspace').style.display = 'block';
         $('repo-info').textContent = `${cfg.github.owner}/${cfg.github.repo} @ ${cfg.github.branch}`;
         await Promise.all([
+            loadSections(),
             loadProjects(),
             loadGames(),
             loadDiaries()
@@ -258,11 +259,277 @@
                 document.querySelectorAll('.admin-nav .btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 const tab = btn.getAttribute('data-tab');
-                ['projects', 'games', 'diaries'].forEach(t => {
+                ['sections', 'projects', 'games', 'diaries'].forEach(t => {
                     $(`tab-${t}`).style.display = (t === tab) ? 'block' : 'none';
                 });
             });
         });
+    }
+
+    // ================================================================
+    //  自定义板块(含板块内条目 CRUD)
+    // ================================================================
+    let sectionsCache = [];
+
+    async function loadSections() {
+        const root = $('admin-list-sections');
+        root.innerHTML = '<div class="loading">加载中</div>';
+        try {
+            sectionsCache = await window.API.listSections();
+            renderAdminSections();
+        } catch (e) {
+            root.innerHTML = `<div class="empty-state"><span class="emoji">⚠️</span>${esc(e.message)}</div>`;
+        }
+    }
+
+    function renderAdminSections() {
+        const root = $('admin-list-sections');
+        if (!sectionsCache.length) {
+            root.innerHTML = `<div class="empty-state"><span class="emoji">🗂️</span>暂无自定义板块,使用上方表单添加</div>`;
+            return;
+        }
+        root.innerHTML = sectionsCache.map(s => `
+            <div class="admin-item" style="flex-direction:column;align-items:stretch;">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+                    <div class="info" style="flex:1;">
+                        <div class="title">${esc(s.emoji || '🗂️')} ${esc(s.name)} <span style="color:var(--text-muted);font-size:12px;font-weight:normal;">(${(s.items||[]).length} 个条目)</span></div>
+                        ${s.description ? `<div class="meta" style="margin-top:4px;color:var(--text-secondary);">${esc(s.description)}</div>` : ''}
+                        <div class="meta" style="margin-top:4px;">📅 ${esc(fmtDate(s.updatedAt))}</div>
+                    </div>
+                    <div class="actions-bar">
+                        <button class="btn btn-sm" data-sec-edit="${esc(s.id)}">编辑</button>
+                        <button class="btn btn-sm" data-sec-items="${esc(s.id)}">管理条目</button>
+                        <button class="btn btn-sm btn-danger" data-sec-del="${esc(s.id)}">删除板块</button>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+
+        root.querySelectorAll('[data-sec-edit]').forEach(b => b.addEventListener('click', () => editSection(b.getAttribute('data-sec-edit'))));
+        root.querySelectorAll('[data-sec-items]').forEach(b => b.addEventListener('click', () => openSectionItemsModal(b.getAttribute('data-sec-edit'))));
+        root.querySelectorAll('[data-sec-del]').forEach(b => b.addEventListener('click', () => deleteSection(b.getAttribute('data-sec-edit'))));
+    }
+
+    function editSection(id) {
+        const s = sectionsCache.find(x => x.id === id);
+        if (!s) return;
+        $('sec-id').value = s.id;
+        $('sec-name').value = s.name || '';
+        $('sec-emoji').value = s.emoji || '';
+        $('sec-desc').value = s.description || '';
+        window.scrollTo({ top: $('form-section').offsetTop - 20, behavior: 'smooth' });
+    }
+
+    async function deleteSection(id) {
+        const s = sectionsCache.find(x => x.id === id);
+        if (!s) return;
+        const itemCount = (s.items || []).length;
+        if (!confirm(`确定删除板块「${s.name}」?\n该板块下 ${itemCount} 个条目将一并删除${s.items && s.items.some(i => i.filePath) ? '(关联文件也会清理)' : ''}。`)) return;
+        await withLoading(document.body, async () => {
+            // 删除该板块下所有关联文件
+            if (s.items) {
+                for (const it of s.items) {
+                    if (it.filePath) {
+                        try {
+                            const meta = await window.API.getFileMeta(it.filePath);
+                            if (meta) await window.API.deleteFile(it.filePath, meta.sha, `delete: ${it.name}`);
+                        } catch (e) { console.warn('文件删除失败', e); }
+                    }
+                }
+            }
+            sectionsCache = sectionsCache.filter(x => x.id !== id);
+            await window.API.saveSections(sectionsCache);
+            renderAdminSections();
+            toast('板块已删除', 'success');
+        });
+    }
+
+    async function submitSection(e) {
+        e.preventDefault();
+        const btn = $('sec-submit');
+        await withLoading(btn, async () => {
+            const id = $('sec-id').value || ('section_' + uuid());
+            const name = $('sec-name').value.trim();
+            if (!name) throw new Error('请填写板块名称');
+            const emoji = $('sec-emoji').value.trim() || '📋';
+            const description = $('sec-desc').value.trim();
+
+            const existing = sectionsCache.find(x => x.id === id);
+            const item = {
+                id, name, emoji, description,
+                items: existing ? (existing.items || []) : [],
+                updatedAt: new Date().toISOString()
+            };
+            if (!existing) item.createdAt = item.updatedAt;
+
+            sectionsCache = existing
+                ? sectionsCache.map(x => x.id === id ? item : x)
+                : [...sectionsCache, item];
+
+            await window.API.saveSections(sectionsCache);
+            renderAdminSections();
+            resetSectionForm();
+            toast(existing ? '板块已更新' : '板块已添加', 'success');
+        });
+    }
+
+    function resetSectionForm() {
+        $('form-section').reset();
+        $('sec-id').value = '';
+    }
+
+    // ---------- 板块内条目管理(弹窗) ----------
+    function openSectionItemsModal(sectionId) {
+        const s = sectionsCache.find(x => x.id === sectionId);
+        if (!s) return;
+
+        const mask = document.createElement('div');
+        mask.className = 'modal-mask';
+        mask.innerHTML = `
+            <div class="modal" style="max-width:640px;">
+                <div class="modal-header">
+                    <h3>${esc(s.emoji || '🗂️')} ${esc(s.name)} · 条目管理</h3>
+                    <button class="modal-close" aria-label="关闭">&times;</button>
+                </div>
+
+                <form id="form-sec-item" style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border-color);">
+                    <input type="hidden" id="item-id" />
+                    <div class="form-group">
+                        <label>条目名称 <span class="required">*</span></label>
+                        <input type="text" id="item-name" required maxlength="80" placeholder="例:抓取算法 v2" />
+                    </div>
+                    <div class="form-group">
+                        <label>简介</label>
+                        <textarea id="item-desc" maxlength="300" placeholder="一句话说明..."></textarea>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>标签(逗号分隔)</label>
+                            <input type="text" id="item-tags" placeholder="例:算法, 机械臂" />
+                        </div>
+                        <div class="form-group">
+                            <label>关联文件(可选)</label>
+                            <input type="file" id="item-file" />
+                        </div>
+                    </div>
+                    <div class="actions-bar">
+                        <button type="submit" class="btn btn-primary btn-sm" id="item-submit">添加/更新</button>
+                        <button type="button" class="btn btn-sm" id="item-reset">清空</button>
+                    </div>
+                </form>
+
+                <div id="modal-item-list"></div>
+            </div>`;
+        document.body.appendChild(mask);
+
+        const closeModal = () => mask.remove();
+        mask.querySelector('.modal-close').addEventListener('click', closeModal);
+        mask.addEventListener('click', e => { if (e.target === mask) closeModal(); });
+
+        // 渲染条目列表
+        const renderItems = () => {
+            const list = mask.querySelector('#modal-item-list');
+            const items = s.items || [];
+            if (!items.length) {
+                list.innerHTML = `<div class="empty-state"><span class="emoji">📋</span>暂无条目</div>`;
+                return;
+            }
+            list.innerHTML = items.map(it => `
+                <div class="admin-item">
+                    <div class="info">
+                        <div class="title">${esc(it.name)}</div>
+                        ${it.description ? `<div class="meta" style="color:var(--text-secondary);margin-top:4px;">${esc(it.description)}</div>` : ''}
+                        <div class="meta" style="margin-top:4px;">
+                            ${it.tags && it.tags.length ? '#' + it.tags.map(esc).join(' #') : ''}
+                            ${it.filePath ? ' · 📎 已上传文件' : ''}
+                        </div>
+                    </div>
+                    <div class="actions-bar">
+                        <button class="btn btn-sm" data-item-edit="${esc(it.id)}">编辑</button>
+                        <button class="btn btn-sm btn-danger" data-item-del="${esc(it.id)}">删除</button>
+                    </div>
+                </div>
+            `).join('');
+
+            list.querySelectorAll('[data-item-edit]').forEach(b => b.addEventListener('click', () => editSecItem(s, b.getAttribute('data-item-edit'), mask)));
+            list.querySelectorAll('[data-item-del]').forEach(b => b.addEventListener('click', () => deleteSecItem(s, b.getAttribute('data-item-del'), mask)));
+        };
+
+        const editSecItem = (section, itemId, maskEl) => {
+            const it = (section.items || []).find(x => x.id === itemId);
+            if (!it) return;
+            maskEl.querySelector('#item-id').value = it.id;
+            maskEl.querySelector('#item-name').value = it.name || '';
+            maskEl.querySelector('#item-desc').value = it.description || '';
+            maskEl.querySelector('#item-tags').value = (it.tags || []).join(', ');
+            maskEl.querySelector('#item-file').value = '';
+        };
+
+        const deleteSecItem = async (section, itemId, maskEl) => {
+            const it = (section.items || []).find(x => x.id === itemId);
+            if (!it) return;
+            if (!confirm(`删除条目「${it.name}」?`)) return;
+            await withLoading(document.body, async () => {
+                if (it.filePath) {
+                    try {
+                        const meta = await window.API.getFileMeta(it.filePath);
+                        if (meta) await window.API.deleteFile(it.filePath, meta.sha, `delete: ${it.name}`);
+                    } catch (e) { console.warn('文件删除失败', e); }
+                }
+                section.items = (section.items || []).filter(x => x.id !== itemId);
+                // 同步到 sectionsCache
+                sectionsCache = sectionsCache.map(x => x.id === section.id ? section : x);
+                await window.API.saveSections(sectionsCache);
+                renderItems();
+                toast('条目已删除', 'success');
+            });
+        };
+
+        // 表单提交
+        mask.querySelector('#form-sec-item').addEventListener('submit', async (ev) => {
+            ev.preventDefault();
+            const submitBtn = mask.querySelector('#item-submit');
+            await withLoading(submitBtn, async () => {
+                const itemId = mask.querySelector('#item-id').value || ('item_' + uuid());
+                const name = mask.querySelector('#item-name').value.trim();
+                if (!name) throw new Error('请填写条目名称');
+                const description = mask.querySelector('#item-desc').value.trim();
+                const tags = mask.querySelector('#item-tags').value.split(',').map(t => t.trim()).filter(Boolean);
+                const file = mask.querySelector('#item-file').files[0];
+
+                const existing = (s.items || []).find(x => x.id === itemId);
+                let filePath = existing ? existing.filePath : null;
+                if (file) {
+                    filePath = await window.API.uploadSectionFile(file);
+                }
+
+                const item = {
+                    id: itemId, name, description, tags, filePath,
+                    updatedAt: new Date().toISOString()
+                };
+                if (!existing) item.createdAt = item.updatedAt;
+
+                s.items = existing
+                    ? (s.items || []).map(x => x.id === itemId ? item : x)
+                    : [...(s.items || []), item];
+
+                // 同步 sectionsCache 并保存
+                sectionsCache = sectionsCache.map(x => x.id === s.id ? s : x);
+                await window.API.saveSections(sectionsCache);
+                renderItems();
+                // 清空表单
+                mask.querySelector('#form-sec-item').reset();
+                mask.querySelector('#item-id').value = '';
+                toast(existing ? '条目已更新' : '条目已添加', 'success');
+            });
+        });
+
+        mask.querySelector('#item-reset').addEventListener('click', () => {
+            mask.querySelector('#form-sec-item').reset();
+            mask.querySelector('#item-id').value = '';
+        });
+
+        renderItems();
     }
 
     // ================================================================
@@ -651,6 +918,10 @@
 
         // 退出
         $('logout-btn').addEventListener('click', logout);
+
+        // 板块管理
+        $('form-section').addEventListener('submit', submitSection);
+        $('sec-reset').addEventListener('click', resetSectionForm);
 
         $('form-project').addEventListener('submit', submitProject);
         $('proj-reset').addEventListener('click', resetProjectForm);

@@ -36,6 +36,7 @@ window.SITE_CONFIG = {
             projects: 'data/projects.json',
             games: 'data/games.json',
             diaries: 'data/diaries.json',
+            sections: 'data/sections.json',
             diariesDir: 'data/diaries',
             uploadsDir: 'data/uploads'
         }

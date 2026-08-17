@@ -333,6 +333,29 @@
             return ghGetText(relativePath);
         },
 
+        // ---- 自定义板块 ----
+        listSections() {
+            return ghGetJson(cfg.github.paths.sections, []);
+        },
+        async saveSections(list) {
+            const meta = await ghGetMeta(cfg.github.paths.sections);
+            await ghPutText(
+                cfg.github.paths.sections,
+                JSON.stringify(list, null, 2),
+                meta ? 'chore: update sections.json' : 'chore: init sections.json',
+                meta ? meta.sha : null
+            );
+        },
+        /**
+         * 上传板块条目关联文件
+         */
+        async uploadSectionFile(file) {
+            const path = `${cfg.github.paths.uploadsDir}/${Date.now()}-${file.name}`;
+            const b64 = await fileToBase64(file);
+            await ghPutBinary(path, b64, `upload: ${file.name}`);
+            return path;
+        },
+
         // ---- 通用删除 ----
         async deleteFile(path, sha, message) {
             return ghDelete(path, sha, message || `delete: ${path}`);

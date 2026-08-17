@@ -223,20 +223,64 @@
         });
     }
 
+    // ---------- 渲染:自定义板块 ----------
+    function renderSections(sections) {
+        const grid = document.querySelector('.main-grid');
+        // 移除已渲染的自定义板块(避免重复)
+        grid.querySelectorAll('.panel-custom').forEach(el => el.remove());
+
+        if (!sections.length) return;
+
+        sections.forEach(sec => {
+            const panel = document.createElement('section');
+            panel.className = 'panel panel-custom';
+            panel.dataset.id = sec.id;
+
+            const items = sec.items || [];
+            const itemsHtml = items.length ? items.map(it => `
+                <div class="item-card">
+                    <div class="item-title">${esc(it.name)}</div>
+                    ${it.description ? `<div class="item-desc">${esc(it.description)}</div>` : ''}
+                    <div class="item-meta">
+                        ${it.updatedAt ? `<span class="tag">📅 ${esc(fmtDate(it.updatedAt))}</span>` : ''}
+                        ${it.tags && it.tags.length ? it.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('') : ''}
+                        ${it.filePath ? `<a class="btn btn-sm btn-primary" href="${esc(window.API.rawUrl(it.filePath))}" target="_blank" rel="noopener">⬇ 下载</a>` : ''}
+                    </div>
+                </div>
+            `).join('') : `
+                <div class="empty-state">
+                    <span class="emoji">${esc(sec.emoji || '📋')}</span>
+                    暂无内容
+                </div>`;
+
+            panel.innerHTML = `
+                <div class="panel-header">
+                    <h2 class="panel-title">
+                        <span class="emoji">${esc(sec.emoji || '📋')}</span> ${esc(sec.name)}
+                    </h2>
+                    <span class="panel-count">${items.length}</span>
+                </div>
+                <div class="panel-body">${itemsHtml}</div>
+            `;
+            grid.appendChild(panel);
+        });
+    }
+
     // ---------- 主入口 ----------
     async function init() {
         renderHeader();
         renderContact();
         document.getElementById('year').textContent = new Date().getFullYear();
 
-        // 并行加载三个数据源
+        // 并行加载四个数据源(含自定义板块)
         const results = await Promise.allSettled([
             window.API.listProjects(),
             window.API.listGames(),
-            window.API.listDiaries()
+            window.API.listDiaries(),
+            window.API.listSections()
         ]);
 
-        const [proj, games, diaries] = results.map(r => {
+        const [proj, games, diaries, sections] = results.map(r => {
             if (r.status === 'fulfilled') return r.value;
             console.error('[加载失败]', r.reason);
             return [];
@@ -245,10 +289,12 @@
         if (results[0].status === 'rejected') toast('工程数据加载失败', 'error');
         if (results[1].status === 'rejected') toast('游戏数据加载失败', 'error');
         if (results[2].status === 'rejected') toast('日记数据加载失败', 'error');
+        if (results[3].status === 'rejected') toast('自定义板块加载失败', 'error');
 
         renderProjects(proj);
         renderGames(games);
         renderDiaries(diaries);
+        renderSections(sections);
     }
 
     document.addEventListener('DOMContentLoaded', init);
