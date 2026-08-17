@@ -3,457 +3,88 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>GitHub Pages 测试</title>
-    <style>
-        /* ---------- 全局重置 & 基础样式 ---------- */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', 'PingFang SC', Roboto, system-ui, -apple-system, sans-serif;
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background: linear-gradient(145deg, #0d1117 0%, #161b22 100%);
-            padding: 20px;
-        }
-
-        .card {
-            max-width: 720px;
-            width: 100%;
-            background: #1c2333;
-            border-radius: 32px;
-            padding: 48px 40px 40px;
-            box-shadow:
-                0 20px 60px rgba(0, 0, 0, 0.7),
-                0 0 0 1px rgba(255, 255, 255, 0.04) inset;
-            backdrop-filter: blur(2px);
-            transition: transform 0.25s ease, box-shadow 0.3s ease;
-        }
-
-        .card:hover {
-            transform: translateY(-4px);
-            box-shadow:
-                0 28px 80px rgba(0, 0, 0, 0.8),
-                0 0 0 1px rgba(255, 255, 255, 0.07) inset;
-        }
-
-        /* ---------- 头部 ---------- */
-        .header {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            margin-bottom: 24px;
-        }
-
-        .status-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            background: #2ea0431a;
-            padding: 6px 18px 6px 14px;
-            border-radius: 100px;
-            border: 1px solid #2ea04340;
-            color: #3fb950;
-            font-size: 14px;
-            font-weight: 600;
-            letter-spacing: 0.3px;
-        }
-
-        .status-dot {
-            display: inline-block;
-            width: 10px;
-            height: 10px;
-            background: #3fb950;
-            border-radius: 50%;
-            animation: pulse-dot 2s ease-in-out infinite;
-            box-shadow: 0 0 8px #3fb95080;
-        }
-
-        @keyframes pulse-dot {
-            0%,
-            100% {
-                opacity: 1;
-                transform: scale(1);
-            }
-            50% {
-                opacity: 0.6;
-                transform: scale(0.85);
-            }
-        }
-
-        .title {
-            font-size: 28px;
-            font-weight: 700;
-            color: #f0f6fc;
-            letter-spacing: -0.3px;
-        }
-
-        .title span {
-            color: #58a6ff;
-        }
-
-        /* ---------- 信息卡片 ---------- */
-        .info-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
-            margin: 28px 0 24px;
-        }
-
-        .info-item {
-            background: #0d1117cc;
-            border-radius: 16px;
-            padding: 18px 20px;
-            border: 1px solid #30363d;
-            transition: border-color 0.2s;
-        }
-
-        .info-item:hover {
-            border-color: #58a6ff66;
-        }
-
-        .info-item .label {
-            font-size: 12px;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: #8b949e;
-            margin-bottom: 6px;
-        }
-
-        .info-item .value {
-            font-size: 18px;
-            font-weight: 600;
-            color: #f0f6fc;
-            word-break: break-all;
-        }
-
-        .info-item .value small {
-            font-weight: 400;
-            font-size: 14px;
-            color: #8b949e;
-        }
-
-        /* ---------- 交互区域 ---------- */
-        .interaction {
-            background: #0d1117cc;
-            border-radius: 20px;
-            padding: 28px 24px;
-            margin: 12px 0 20px;
-            border: 1px solid #30363d;
-        }
-
-        .interaction p {
-            color: #c9d1d9;
-            font-size: 15px;
-            line-height: 1.6;
-            margin-bottom: 18px;
-        }
-
-        .btn-group {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 12px;
-            align-items: center;
-        }
-
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 10px 24px;
-            border-radius: 100px;
-            font-weight: 600;
-            font-size: 15px;
-            border: none;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            background: #21262d;
-            color: #c9d1d9;
-            border: 1px solid #30363d;
-        }
-
-        .btn:hover {
-            background: #30363d;
-            border-color: #58a6ff66;
-            color: #f0f6fc;
-            transform: scale(1.02);
-        }
-
-        .btn-primary {
-            background: #238636;
-            border-color: #2ea043;
-            color: #fff;
-        }
-
-        .btn-primary:hover {
-            background: #2ea043;
-            border-color: #3fb950;
-        }
-
-        .btn:active {
-            transform: scale(0.96);
-        }
-
-        .click-counter {
-            display: inline-flex;
-            align-items: baseline;
-            gap: 6px;
-            background: #0d1117;
-            padding: 8px 20px 8px 16px;
-            border-radius: 100px;
-            border: 1px solid #30363d;
-            color: #8b949e;
-            font-size: 15px;
-        }
-
-        .click-counter strong {
-            color: #f0f6fc;
-            font-size: 22px;
-            min-width: 28px;
-            text-align: center;
-        }
-
-        /* ---------- 页脚 ---------- */
-        .footer {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 12px;
-            margin-top: 20px;
-            padding-top: 18px;
-            border-top: 1px solid #30363d;
-            color: #8b949e;
-            font-size: 14px;
-        }
-
-        .footer a {
-            color: #58a6ff;
-            text-decoration: none;
-            font-weight: 500;
-            transition: color 0.2s;
-        }
-
-        .footer a:hover {
-            color: #79c0ff;
-            text-decoration: underline;
-        }
-
-        .footer .repo-link {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        /* ---------- 响应式 ---------- */
-        @media (max-width: 600px) {
-            .card {
-                padding: 28px 18px 24px;
-            }
-
-            .title {
-                font-size: 22px;
-            }
-
-            .info-grid {
-                grid-template-columns: 1fr;
-                gap: 12px;
-            }
-
-            .btn-group {
-                flex-direction: column;
-                align-items: stretch;
-            }
-
-            .btn {
-                justify-content: center;
-            }
-
-            .click-counter {
-                justify-content: center;
-            }
-
-            .footer {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-        }
-    </style>
+    <title>user3055WEB · 个人空间</title>
+    <meta name="description" content="user3055WEB 的个人空间 - 工程与资源 / 游戏开发进度 / 个人日记" />
+    <link rel="stylesheet" href="assets/css/style.css" />
 </head>
 <body>
 
-    <div class="card">
+    <div class="container">
 
-        <!-- 头部 -->
-        <div class="header">
+        <!-- ========== 头部 ========== -->
+        <header class="site-header">
             <div class="status-badge">
                 <span class="status-dot"></span>
-                GitHub Pages 在线
+                <span id="status-text">在线</span>
             </div>
-            <h1 class="title">🚀 <span>测试</span>页面</h1>
-        </div>
+            <h1 class="brand">🚀 <span class="accent" id="brand-name">user3055WEB</span></h1>
+            <p class="subtitle" id="brand-subtitle">工程 · 游戏 · 日记</p>
+        </header>
 
-        <!-- 信息网格 -->
-        <div class="info-grid">
-            <div class="info-item">
-                <div class="label">📅 部署时间</div>
-                <div class="value" id="deploy-time">加载中…</div>
+        <!-- ========== 主体三栏 ========== -->
+        <main class="main-grid">
+
+            <!-- 板块 1: 工程与资源 -->
+            <section class="panel" id="panel-projects">
+                <div class="panel-header">
+                    <h2 class="panel-title"><span class="emoji">📦</span> 工程与资源</h2>
+                    <span class="panel-count" id="count-projects">0</span>
+                </div>
+                <div class="panel-body" id="list-projects">
+                    <div class="loading">加载中</div>
+                </div>
+            </section>
+
+            <!-- 板块 2: 游戏开发进度 -->
+            <section class="panel" id="panel-games">
+                <div class="panel-header">
+                    <h2 class="panel-title"><span class="emoji">🎮</span> 游戏开发进度</h2>
+                    <span class="panel-count" id="count-games">0</span>
+                </div>
+                <div class="panel-body" id="list-games">
+                    <div class="loading">加载中</div>
+                </div>
+            </section>
+
+            <!-- 板块 3: 个人日记 -->
+            <section class="panel" id="panel-diaries">
+                <div class="panel-header">
+                    <h2 class="panel-title"><span class="emoji">📝</span> 个人日记</h2>
+                    <span class="panel-count" id="count-diaries">0</span>
+                </div>
+                <div class="panel-body" id="list-diaries">
+                    <div class="loading">加载中</div>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- ========== 底部联系方式 ========== -->
+        <footer class="site-footer">
+            <div class="contact-list" id="contact-list">
+                <!-- 由 home.js 动态渲染 -->
             </div>
-            <div class="info-item">
-                <div class="label">🌐 用户代理</div>
-                <div class="value" id="user-agent"><small>检测中…</small></div>
+            <div class="footer-copy">
+                © <span id="year"></span> · <a href="index.html">user3055WEB</a> · 由 GitHub Pages 托管
+                <span style="margin-left:12px;opacity:0.6;">|</span>
+                <a href="admin.html" style="margin-left:12px;font-size:12px;">管理入口</a>
             </div>
-            <div class="info-item">
-                <div class="label">📦 页面来源</div>
-                <div class="value" id="page-origin">—</div>
-            </div>
-            <div class="info-item">
-                <div class="label">📊 状态</div>
-                <div class="value" style="color:#3fb950;">✅ 运行正常</div>
-            </div>
-        </div>
-
-        <!-- 交互区域 -->
-        <div class="interaction">
-            <p>
-                👋 这是一个用于测试 <strong style="color:#58a6ff;">GitHub Pages</strong> 的静态页面。
-                如果看到此内容，说明你的 Pages 服务已经成功部署！
-            </p>
-
-            <div class="btn-group">
-                <button class="btn btn-primary" id="click-btn">
-                    👍 点我测试交互
-                </button>
-
-                <button class="btn" id="reset-btn">
-                    ↻ 重置计数
-                </button>
-
-                <span class="click-counter">
-                    🖱️ 点击次数：<strong id="click-count">0</strong>
-                </span>
-            </div>
-        </div>
-
-        <!-- 页脚 -->
-        <div class="footer">
-            <span>
-                © 2026 · 由
-                <a href="#" target="_blank">GitHub Pages</a>
-                托管
-            </span>
-            <a class="repo-link" href="#" target="_blank">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38
-                    0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01
-                    -.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89
-                    -3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18
-                    1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82
-                    1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0
-                    .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
-                </svg>
-                查看源码
-            </a>
-        </div>
+        </footer>
 
     </div>
 
-    <script>
-        (function() {
-            'use strict';
+    <!-- Toast 容器 -->
+    <div class="toast-container" id="toast-container"></div>
 
-            // ---------- 1. 显示部署时间 ----------
-            const now = new Date();
-            const timeStr = now.toLocaleString('zh-CN', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: false
-            });
-            document.getElementById('deploy-time').textContent = timeStr;
+    <!-- Markdown 渲染库(用于日记详情) -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
 
-            // ---------- 2. 显示用户代理 (简略) ----------
-            const ua = navigator.userAgent;
-            let shortUA = 'Unknown';
-            if (ua.includes('Chrome') && !ua.includes('Edg')) {
-                shortUA = 'Chrome';
-            } else if (ua.includes('Firefox')) {
-                shortUA = 'Firefox';
-            } else if (ua.includes('Safari') && !ua.includes('Chrome')) {
-                shortUA = 'Safari';
-            } else if (ua.includes('Edg')) {
-                shortUA = 'Edge';
-            } else if (ua.includes('OPR') || ua.includes('Opera')) {
-                shortUA = 'Opera';
-            } else {
-                shortUA = ua.slice(0, 30) + '…';
-            }
-            document.getElementById('user-agent').innerHTML = shortUA + ' <small>' +
-                (navigator.platform || '') + '</small>';
+    <!-- 配置 & API -->
+    <script src="assets/js/config.js"></script>
+    <script src="assets/js/api.js"></script>
 
-            // ---------- 3. 显示页面来源 ----------
-            const origin = window.location.origin;
-            document.getElementById('page-origin').textContent = origin;
-
-            // ---------- 4. 点击计数器 ----------
-            let count = 0;
-            const clickBtn = document.getElementById('click-btn');
-            const resetBtn = document.getElementById('reset-btn');
-            const countDisplay = document.getElementById('click-count');
-
-            function updateCounter() {
-                countDisplay.textContent = count;
-                // 微反馈：按钮文字闪动
-                clickBtn.style.transform = 'scale(0.96)';
-                setTimeout(() => { clickBtn.style.transform = ''; }, 150);
-            }
-
-            clickBtn.addEventListener('click', function() {
-                count += 1;
-                updateCounter();
-            });
-
-            resetBtn.addEventListener('click', function() {
-                count = 0;
-                updateCounter();
-                // 重置按钮自身反馈
-                resetBtn.style.transform = 'scale(0.94)';
-                setTimeout(() => { resetBtn.style.transform = ''; }, 180);
-            });
-
-            // ---------- 5. 键盘快捷键 (R 键重置) ----------
-            document.addEventListener('keydown', function(e) {
-                if (e.key === 'r' || e.key === 'R') {
-                    if (!e.ctrlKey && !e.metaKey && !e.altKey) {
-                        e.preventDefault();
-                        resetBtn.click();
-                    }
-                }
-            });
-
-            // ---------- 6. 控制台欢迎 ----------
-            console.log('%c🚀 GitHub Pages 测试页面已加载', 'font-size:18px; font-weight:bold; color:#58a6ff;');
-            console.log('%c部署时间: ' + timeStr, 'color:#8b949e;');
-            console.log('%c页面地址: ' + origin, 'color:#8b949e;');
-
-            // 额外：检测是否为 GitHub Pages 域
-            if (origin.includes('github.io')) {
-                console.log('✅ 检测到 GitHub Pages 域名 (github.io)');
-            } else {
-                console.log('ℹ️ 当前域名: ' + origin + ' (非 github.io，可能是自定义域或本地测试)');
-            }
-
-        })();
-    </script>
+    <!-- 展示页逻辑 -->
+    <script src="assets/js/pages/home.js"></script>
 
 </body>
 </html>
