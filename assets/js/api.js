@@ -76,8 +76,35 @@
     // ================================================================
 
     /**
+     * 带超时的 fetch(避免请求挂起导致 UI 永远加载中)
+     * @param {string} url
+     * @param {object} options
+     * @param {number} timeoutMs 超时毫秒,默认 8000
+     */
+    async function fetchWithTimeout(url, options, timeoutMs) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs || 8000);
+        try {
+            return await fetch(url, { ...options, signal: controller.signal });
+        } finally {
+            clearTimeout(timer);
+        }
+    }
+
+    /**
+     * 读取 raw.githubusercontent.com 上的 JSON(只读,无需鉴权,CDN 稳定)
+     */
+    async function ghGetJsonRaw(path, fallback) {
+        const rawUrl = `https://raw.githubusercontent.com/${cfg.github.owner}/${cfg.github.repo}/${cfg.github.branch}/${path}`;
+        const resp = await fetchWithTimeout(rawUrl, {}, 10000);
+        if (!resp.ok) return fallback;
+        return await resp.json();
+    }
+
+    /**
      * 读取仓库中某个 JSON 文件,返回解析后的对象
      * 文件不存在时返回 fallback(默认空数组)
+     * 策略:先试 api.github.com(带 token 可读最新),超时/失败则回退 raw(CDN 稳定)
      */
     async function ghGetJson(path, fallback) {
         const url = `${GH_API}/repos/${cfg.github.owner}/${cfg.github.repo}/contents/${path}?ref=${cfg.github.branch}`;
@@ -85,16 +112,13 @@
         const token = getToken();
         if (token) headers.Authorization = `Bearer ${token}`;
 
-        // 展示页无 token 时使用 raw 链接(只读,无需鉴权,但有缓存)
         let resp;
         try {
-            resp = await fetch(url, { headers });
+            resp = await fetchWithTimeout(url, { headers }, 8000);
         } catch (e) {
-            // 网络错误时尝试 raw
-            const rawUrl = `https://raw.githubusercontent.com/${cfg.github.owner}/${cfg.github.repo}/${cfg.github.branch}/${path}`;
-            const rawResp = await fetch(rawUrl);
-            if (!rawResp.ok) return fallback;
-            return await rawResp.json();
+            // 网络错误或超时 → 回退 raw
+            console.warn(`[ghGetJson] api.github.com 失败,回退 raw: ${path}`, e.message);
+            return await ghGetJsonRaw(path, fallback);
         }
 
         if (resp.status === 404) return fallback;
@@ -109,7 +133,7 @@
      */
     async function ghGetText(path) {
         const rawUrl = `https://raw.githubusercontent.com/${cfg.github.owner}/${cfg.github.repo}/${cfg.github.branch}/${path}`;
-        const resp = await fetch(rawUrl);
+        const resp = await fetchWithTimeout(rawUrl, {}, 10000);
         if (!resp.ok) throw await parseError(resp);
         return await resp.text();
     }
