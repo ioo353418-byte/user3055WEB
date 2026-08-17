@@ -97,17 +97,27 @@
         }, 3500);
     }
     async function withLoading(btn, fn) {
-        const oldText = btn.textContent;
-        btn.disabled = true;
-        btn.textContent = '处理中...';
+        // 只有真正的 button 才改 textContent/disabled,避免误传 document.body 导致整个 DOM 被清空
+        const isButton = btn && btn.tagName === 'BUTTON';
+        const oldText = isButton ? btn.textContent : null;
+        if (isButton) {
+            btn.disabled = true;
+            btn.textContent = '处理中...';
+        } else {
+            document.body.style.cursor = 'wait';
+        }
         try {
             await fn();
         } catch (e) {
             console.error(e);
             toast(e.message || '操作失败', 'error');
         } finally {
-            btn.disabled = false;
-            btn.textContent = oldText;
+            if (isButton) {
+                btn.disabled = false;
+                btn.textContent = oldText;
+            } else {
+                document.body.style.cursor = '';
+            }
         }
     }
 
